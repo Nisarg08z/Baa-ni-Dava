@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
+import { DataProvider } from './context/DataContext';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Manage from './pages/Manage';
@@ -23,14 +24,16 @@ function App() {
                 {showWelcome && <WelcomeScreen key="welcome" />}
             </AnimatePresence>
 
-            <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-10">
-                <Navbar />
-                <Routes>
-                    <Route path="/" element={<Home />} />
-                    <Route path="/manage" element={<Manage />} />
-                    <Route path="/history" element={<History />} />
-                </Routes>
-            </div>
+            <DataProvider>
+                <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-10">
+                    <Navbar />
+                    <Routes>
+                        <Route path="/" element={<Home />} />
+                        <Route path="/manage" element={<Manage />} />
+                        <Route path="/history" element={<History />} />
+                    </Routes>
+                </div>
+            </DataProvider>
         </Router>
     );
 }

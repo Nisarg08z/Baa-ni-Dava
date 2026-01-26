@@ -3,27 +3,18 @@ import { Link, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import jsPDF from 'jspdf';
 import { Download, Calendar, Package, Clock, RefreshCw } from 'lucide-react';
+import Loading from '../components/Loading';
+
+import { useData } from '../context/DataContext';
 
 const History = () => {
     const navigate = useNavigate();
+    const { history, fetchHistory, loadingHistory } = useData();
     const [expandedId, setExpandedId] = useState(null);
-    const [history, setHistory] = useState([]);
-    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         fetchHistory();
-    }, []);
-
-    const fetchHistory = async () => {
-        try {
-            const res = await api.get('/history');
-            setHistory(res.data);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    };
+    }, [fetchHistory]);
 
     const toggleExpand = (id) => {
         setExpandedId(expandedId === id ? null : id);
@@ -91,7 +82,7 @@ const History = () => {
                 <Clock className="w-8 h-8" /> Purchase History
             </h1>
 
-            {loading ? <p>Loading...</p> : (
+            {loadingHistory ? <Loading /> : (
                 <div className="space-y-4">
                     {history.map((record) => (
                         <div key={record._id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">

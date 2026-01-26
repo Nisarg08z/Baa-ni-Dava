@@ -3,56 +3,44 @@ import { Link, useLocation } from 'react-router-dom';
 import api from '../api/axios';
 import jsPDF from 'jspdf';
 import { ShoppingCart, FileDown, Check, Search, Filter } from 'lucide-react';
+import Loading from '../components/Loading';
+
+import { useData } from '../context/DataContext';
 
 const Home = () => {
     const location = useLocation();
-    const [medicines, setMedicines] = useState([]);
-    const [stores, setStores] = useState([]);
+    const { medicines, fetchData, loading, invalidateHistory } = useData();
     const [cart, setCart] = useState({}); // { [medId]: quantityString }
     const [searchTerm, setSearchTerm] = useState('');
-    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [fetchData]);
 
-    const fetchData = async () => {
-        try {
-            const [medRes, storeRes] = await Promise.all([
-                api.get('/data/medicines'),
-                api.get('/data/stores')
-            ]);
-            setMedicines(medRes.data);
-            setStores(storeRes.data);
-
-            // Check for potential re-order from history
-            if (location.state?.cartItems) {
-                const newCart = {};
-                location.state.cartItems.forEach(item => {
-                    // Try to find by ID first
-                    let med = medRes.data.find(m => item.medicineId && m._id === item.medicineId);
-                    // Fallback to name match
-                    if (!med) {
-                        med = medRes.data.find(m => m.name.toLowerCase() === item.name.toLowerCase());
-                    }
-
-                    if (med) {
-                        newCart[med._id] = item.quantity;
-                    }
-                });
-                if (Object.keys(newCart).length > 0) {
-                    setCart(newCart);
-                    // Clear state so refresh doesn't persistence unwantedly? 
-                    // Actually react router state persists on refresh usually, but good to keep.
-                    window.history.replaceState({}, document.title);
+    useEffect(() => {
+        // Check for potential re-order from history when medicines are loaded
+        if (medicines.length > 0 && location.state?.cartItems) {
+            const newCart = {};
+            location.state.cartItems.forEach(item => {
+                // Try to find by ID first
+                let med = medicines.find(m => item.medicineId && m._id === item.medicineId);
+                // Fallback to name match
+                if (!med) {
+                    med = medicines.find(m => m.name.toLowerCase() === item.name.toLowerCase());
                 }
+
+                if (med) {
+                    newCart[med._id] = item.quantity;
+                }
+            });
+            if (Object.keys(newCart).length > 0) {
+                setCart(newCart);
+                // Clear state so refresh doesn't persistence unwantedly? 
+                // Actually react router state persists on refresh usually, but good to keep.
+                window.history.replaceState({}, document.title);
             }
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
         }
-    };
+    }, [medicines, location.state]);
 
     const updateQuantity = (medId, quantity) => {
         setCart(prev => ({ ...prev, [medId]: quantity }));
@@ -94,6 +82,7 @@ const Home = () => {
                 items,
                 totalItems: items.length
             });
+            invalidateHistory();
         } catch (err) {
             console.error('Failed to save history', err);
         }
@@ -186,7 +175,7 @@ const Home = () => {
                 </div>
             </div>
 
-            {loading ? <p>Loading...</p> : (
+            {loading ? <Loading /> : (
                 <div className="space-y-6">
                     {Object.keys(medsByStore).map(storeName => (
                         <div key={storeName} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
