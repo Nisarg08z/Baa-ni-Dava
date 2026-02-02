@@ -13,11 +13,11 @@ const Home = () => {
     const [stores, setStores] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    const [cart, setCart] = useState({}); 
+    const [cart, setCart] = useState({});
     const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
-  
+
         setTimeout(() => {
             setMedicines(initialMedicines);
             setStores(initialStores);
@@ -64,37 +64,47 @@ const Home = () => {
 
     // ... generatePDF function ...
     const generatePDF = async () => {
-        if (selectedCount === 0) return;
+        // if (selectedCount === 0) return; // Generating all now
 
         // Prepare Data
-        const items = [];
-        Object.entries(cart).forEach(([medId, qty]) => {
-            const med = medicines.find(m => m._id === medId);
-            if (med) {
-                items.push({
-                    medicineId: med._id,
-                    name: med.name,
-                    store: med.store?.name || 'Unknown',
-                    quantity: qty,
-                    storeId: med.store?._id
-                });
+        // Prepare Data
+        // We want to list ALL medicines now
+        const items = medicines.map(med => {
+            const decision = cart[med._id]; // { status: 'yes'|'no', quantity: '' }
+            let qtyString = "";
+            const isHomeopathy = med.store?.name?.toLowerCase().includes("homeopathy");
+
+            if (decision?.status === 'yes') {
+                if (isHomeopathy) {
+                    qtyString = `${decision.quantity || ''} Levani`;
+                } else {
+                    qtyString = `${decision.quantity || ''} Chhe`;
+                }
+            } else if (decision?.status === 'no') {
+                qtyString = "Nathi Levani";
+            } else {
+                // If no decision made, what to do? User instructions imply we ask for everything.
+                // If skipped, maybe treating as Nathi Levani or leave blank?
+                // Let's assume pending or empty, strictly follows cart.
+                // But for now let's default to "Nathi Levani" if explicitly No, or maybe just empty if untouched?
+                // Request says "give all medicin... give two option".
+                // Let's assume unchecked = Nathi Levani for safety? Or just skip?
+                // Let's list it as " - " or empty if untouched.
+                qtyString = " - ";
             }
+
+            return {
+                medicineId: med._id,
+                name: med.name,
+                store: med.store?.name || 'Unknown',
+                quantity: qtyString,
+                storeId: med.store?._id
+            };
         });
 
         // PDF Generation
         const doc = new jsPDF();
         const date = new Date().toLocaleDateString();
-
-        doc.setFontSize(22);
-        doc.setTextColor(40, 40, 40);
-        doc.text("Medicine Purchase List", 10, 20);
-
-        doc.setFontSize(12);
-        doc.setTextColor(100, 100, 100);
-        doc.text(`Date: ${date}`, 10, 30);
-        doc.text(`Total Items: ${items.length}`, 10, 36);
-
-        let y = 50;
 
         // Group by Store
         const grouped = {};
@@ -103,33 +113,77 @@ const Home = () => {
             grouped[item.store].push(item);
         });
 
+        let y = 20;
+
         Object.keys(grouped).forEach(storeName => {
             if (y > 250) { doc.addPage(); y = 20; }
 
-            // Store Header
+            // Store Header 
             doc.setFillColor(240, 240, 240);
-            doc.rect(10, y - 6, 190, 10, 'F');
-            doc.setFontSize(14);
+            doc.setDrawColor(200, 200, 200);
+            doc.rect(10, y, 190, 10, 'F'); // Header background
+            doc.rect(10, y, 190, 10, 'S'); // Header border
+
+            doc.setFontSize(12);
             doc.setFont("helvetica", "bold");
             doc.setTextColor(0, 0, 0);
-            doc.text(storeName, 12, y);
+            doc.text(storeName, 15, y + 7);
             y += 10;
 
-            // Items
-            doc.setFontSize(12);
+            // Table Columns Header
+            doc.setFillColor(250, 250, 250);
+            // Col 1 headers - Total width 95 (Start 10)
+            doc.rect(10, y, 60, 8, 'F');  // Name w=60
+            doc.rect(70, y, 35, 8, 'F');  // Amt w=35
+            doc.rect(10, y, 60, 8, 'S');
+            doc.rect(70, y, 35, 8, 'S');
+
+            // Col 2 headers - Total width 95 (Start 105)
+            doc.rect(105, y, 60, 8, 'F'); // Name w=60
+            doc.rect(165, y, 35, 8, 'F'); // Amt w=35
+            doc.rect(105, y, 60, 8, 'S');
+            doc.rect(165, y, 35, 8, 'S');
+
+            doc.setFontSize(10);
+            doc.text("Medicine Name", 12, y + 5);
+            doc.text("Amt", 72, y + 5);
+            doc.text("Medicine Name", 107, y + 5);
+            doc.text("Amt", 167, y + 5);
+            y += 8;
+
+            // Items in 4 columns (2 columns of items)
+            doc.setFontSize(9); // Slightly smaller font to fit names in narrower column
             doc.setFont("helvetica", "normal");
-            grouped[storeName].forEach(item => {
-                if (y > 270) { doc.addPage(); y = 20; }
-                doc.text(`• ${item.name}`, 15, y);
-                doc.text(`${item.quantity}`, 180, y, { align: 'right' });
-                // Dotted line
-                doc.setDrawColor(200, 200, 200);
-                doc.setLineDash([1, 1], 0);
-                doc.line(item.name.length * 2.5 + 20, y, 170, y);
-                doc.setLineDash([]); // reset
-                y += 8;
-            });
-            y += 5;
+
+            const storeItems = grouped[storeName];
+            for (let i = 0; i < storeItems.length; i += 2) {
+                if (y > 270) {
+                    doc.addPage();
+                    y = 20;
+                }
+
+                // Item 1 (Left Side)
+                const item1 = storeItems[i];
+                doc.rect(10, y, 60, 10, 'S'); // Name box
+                doc.rect(70, y, 35, 10, 'S'); // Qty box
+
+                // Truncate or fit text if too long? jsPDF text doesn't auto wrap in rect easily unless splitTextToSize
+                // For now, let's assume names fit or we might need a smaller font. I set size 9 above.
+                doc.text(item1.name, 12, y + 7);
+                doc.text(String(item1.quantity), 72, y + 7);
+
+                // Item 2 (Right Side) - if exists
+                if (i + 1 < storeItems.length) {
+                    const item2 = storeItems[i + 1];
+                    doc.rect(105, y, 60, 10, 'S'); // Name box
+                    doc.rect(165, y, 35, 10, 'S'); // Qty box
+                    doc.text(item2.name, 107, y + 7);
+                    doc.text(String(item2.quantity), 167, y + 7);
+                }
+
+                y += 10;
+            }
+            y += 10; // Space between stores
         });
 
         doc.save(`Medicines_${date.replace(/\//g, '-')}.pdf`);
@@ -181,39 +235,58 @@ const Home = () => {
                             </div>
                             <div className="divide-y divide-gray-100">
                                 {medsByStore[storeName].map(med => {
-                                    const isSelected = Object.prototype.hasOwnProperty.call(cart, med._id);
+                                    const decision = cart[med._id] || {}; // { status: 'yes'|'no', quantity: '' }
+                                    const isYes = decision.status === 'yes';
+                                    const isNo = decision.status === 'no';
+
                                     return (
-                                        <div key={med._id}
-                                            className={`p-4 flex items-start gap-3 transition-colors cursor-pointer border-b last:border-0 border-gray-50 ${isSelected ? 'bg-brand-blue/30' : 'hover:bg-gray-50'}`}
-                                            onClick={(e) => {
-                                                if (e.target.tagName !== 'INPUT') {
-                                                    toggleSelection(med._id, !isSelected);
-                                                }
-                                            }}
-                                        >
-                                            <div className="pt-1">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={isSelected}
-                                                    onChange={(e) => toggleSelection(med._id, e.target.checked)}
-                                                    className="w-6 h-6 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer accent-primary"
-                                                />
+                                        <div key={med._id} className="p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 hover:bg-gray-50 transition-colors">
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-base sm:text-lg font-medium text-gray-800 break-words leading-tight">{med.name}</p>
                                             </div>
-                                            <div className="flex-1 min-w-0 py-1">
-                                                <p className={`text-base sm:text-lg font-medium leading-snug break-words ${isSelected ? 'text-primary' : 'text-gray-700'}`}>{med.name}</p>
-                                            </div>
-                                            {isSelected && (
-                                                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+
+                                            <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
+                                                <div className="flex bg-gray-100 rounded-lg p-1 shrink-0">
+                                                    <button
+                                                        onClick={() => {
+                                                            setCart(prev => ({
+                                                                ...prev,
+                                                                [med._id]: { status: 'yes', quantity: prev[med._id]?.quantity || '' }
+                                                            }));
+                                                        }}
+                                                        className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-md text-sm font-bold transition-all ${isYes ? 'bg-primary text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                                                    >
+                                                        Levani
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setCart(prev => ({
+                                                                ...prev,
+                                                                [med._id]: { status: 'no', quantity: '' }
+                                                            }));
+                                                        }}
+                                                        className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-md text-sm font-bold transition-all ${isNo ? 'bg-red-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                                                    >
+                                                        Nathi
+                                                    </button>
+                                                </div>
+
+                                                {isYes && (
                                                     <input
                                                         type="text"
-                                                        value={cart[med._id]}
-                                                        onChange={(e) => updateQuantity(med._id, e.target.value)}
+                                                        value={decision.quantity || ''}
+                                                        onChange={(e) => {
+                                                            setCart(prev => ({
+                                                                ...prev,
+                                                                [med._id]: { ...prev[med._id], quantity: e.target.value }
+                                                            }));
+                                                        }}
                                                         placeholder="Qty"
-                                                        className="w-20 sm:w-24 px-2 py-2 rounded-lg border border-primary/30 focus:outline-none focus:ring-2 focus:ring-primary text-base shadow-sm"
+                                                        className="w-16 sm:w-24 px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg border border-primary focus:outline-none focus:ring-2 focus:ring-primary/50 font-bold text-center text-sm sm:text-base"
                                                         autoFocus
                                                     />
-                                                </div>
-                                            )}
+                                                )}
+                                            </div>
                                         </div>
                                     );
                                 })}
@@ -229,7 +302,7 @@ const Home = () => {
             )}
 
             {/* Floating Action Button */}
-            {selectedCount > 0 && (
+            {medicines.length > 0 && (
                 <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-secondary text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-4 z-50 hover:scale-105 transition-transform cursor-pointer border-2 border-white ring-2 ring-primary/20" onClick={generatePDF}>
                     <div className="flex flex-col items-start">
                         <span className="text-xs text-brand-blue font-medium">Selected: {selectedCount}</span>
