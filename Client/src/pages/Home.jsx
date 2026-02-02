@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import jsPDF from 'jspdf';
-import { ShoppingCart, FileDown, Check, Search, Filter, Plus, X } from 'lucide-react';
+import { FileDown, Check, Search, Filter } from 'lucide-react';
 import Loading from '../components/Loading';
 
 import { medicines as initialMedicines, stores as initialStores } from '../data/medicines';
@@ -15,9 +15,6 @@ const Home = () => {
 
     const [cart, setCart] = useState({}); 
     const [searchTerm, setSearchTerm] = useState('');
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [newMedName, setNewMedName] = useState('');
-    const [newMedStoreId, setNewMedStoreId] = useState('');
 
     useEffect(() => {
   
@@ -48,20 +45,6 @@ const Home = () => {
         }
     }, [medicines, location.state]);
 
-    const addMedicine = (newMed) => {
-        setMedicines(prev => [...prev, { ...newMed, _id: Date.now().toString() }]);
-    };
-
-    const handleAddMedicine = (e) => {
-        e.preventDefault();
-        if (!newMedName || !newMedStoreId) return;
-
-        const store = stores.find(s => s._id === newMedStoreId);
-        addMedicine({ name: newMedName, store });
-        setNewMedName('');
-        setNewMedStoreId('');
-        setIsModalOpen(false);
-    };
 
     const updateQuantity = (medId, quantity) => {
         setCart(prev => ({ ...prev, [medId]: quantity }));
@@ -185,61 +168,8 @@ const Home = () => {
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    <button
-                        onClick={() => setIsModalOpen(true)}
-                        className="bg-primary text-white p-3 rounded-xl shadow-md hover:bg-primary/90 transition-colors"
-                        title="Add New Medicine"
-                    >
-                        <Plus className="w-6 h-6" />
-                    </button>
                 </div>
             </div>
-
-            {isModalOpen && (
-                <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-bold text-gray-800">Add New Medicine</h2>
-                            <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">
-                                <X className="w-6 h-6" />
-                            </button>
-                        </div>
-                        <form onSubmit={handleAddMedicine} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Medicine Name</label>
-                                <input
-                                    type="text"
-                                    required
-                                    className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
-                                    placeholder="e.g. Dollo 650"
-                                    value={newMedName}
-                                    onChange={e => setNewMedName(e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Store</label>
-                                <select
-                                    required
-                                    className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary focus:border-transparent outline-none bg-white"
-                                    value={newMedStoreId}
-                                    onChange={e => setNewMedStoreId(e.target.value)}
-                                >
-                                    <option value="">Select Store</option>
-                                    {stores.map(s => (
-                                        <option key={s._id} value={s._id}>{s.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <button
-                                type="submit"
-                                className="w-full bg-secondary text-white py-3 rounded-xl font-bold hover:bg-secondary/90 transition-colors mt-2"
-                            >
-                                Add Medicine
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            )}
 
             {loading ? <Loading /> : (
                 <div className="space-y-6">
